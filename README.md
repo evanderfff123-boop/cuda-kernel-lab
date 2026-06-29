@@ -12,6 +12,7 @@ can gradually move into `common/` as patterns stabilize.
 | Operator | Status | Notes |
 |---|---|---|
 | `transpose` | ready | FP32 square matrix transpose with naive, shared-memory, padded, tiled, and cuBLAS baseline variants |
+| `flash_attention` | scaffold | PyTorch JIT extension for single-batch/single-head `[N, D]` FP16 forward attention |
 
 ## Build
 
