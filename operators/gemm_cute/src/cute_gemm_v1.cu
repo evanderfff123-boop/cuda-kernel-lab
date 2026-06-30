@@ -173,6 +173,79 @@ __global__ void cute_gemm_v3_kernel(const float* a,
     C_tile(tid_m, tid_n) = acc;
 }
 
+template<int BM, int BN, int BK>
+__global__ void cute_gemm_v4_kernel(const float* a, 
+                                    const float* b,
+                                    float* c,
+                                    int m,
+                                    int n,
+                                    int k){
+    using namespace cute;
+    const int tid_m = threadIdx.y;
+    const int tid_n = threadIdx.x;
+
+    const int global_m = blockIdx.y * BM + tid_m;
+    const int global_n = blockIdx.x * BN + tid_n;
+
+    // if(global_m >= m || global_n >= n) return;  因为 block 内其它线程还要 __syncthreads()
+    auto A = make_tensor(make_gmem_ptr(a),
+                         make_shape(m, k),
+                         make_stride(k, Int<1>{}));
+    auto B = make_tensor(make_gmem_ptr(b),
+                         make_shape(k, n),
+                         make_stride(n, Int<1>{}));
+    auto C = make_tensor(make_gmem_ptr(c),
+                         make_shape(m, n),
+                         make_stride(n, Int<1>{}));
+    auto C_tile = local_tile(C, 
+                             make_shape(Int<BM>{}, Int<BN>{}),
+                             make_coord(blockIdx.y, blockIdx.x));
+    __shared__ float smem_a[BM * BK];
+    __shared__ float smem_b[BK * BN];
+
+    auto sA = make_tensor(make_smem_ptr(smem_a),
+                          make_shape(Int<BM>{}, Int<BK>{}),
+                          make_stride(Int<BK>{}, Int<1>{}));
+    auto sB = make_tensor(make_smem_ptr(smem_b),
+                          make_shape(Int<BK>{}, Int<BN>{}),
+                          make_stride(Int<BN>{}, Int<1>{}));
+    float acc = 0.0f;
+
+    int num_k_tiles = (k + BK - 1) / BK;
+    for(int k_tile = 0; k_tile < num_k_tiles; ++k_tile){
+        auto A_tile = local_tile(A,
+                                 make_shape(Int<BM>{}, Int<BK>{}),
+                                 make_coord(blockIdx.y, k_tile));
+        auto B_tile = local_tile(B,
+                                 make_shape(Int<BK>{}, Int<BN>{}),
+                                 make_coord(k_tile, blockIdx.x));
+        if(tid_n < BK){
+            int global_k = k_tile * BK + tid_n;
+            sA(tid_m, tid_n) = (global_m < m && global_k < k)
+                ? A_tile(tid_m, tid_n)
+                : 0.0f;
+        }
+
+        if(tid_m < BK){
+            int global_k = k_tile * BK + tid_m;
+            sB(tid_m, tid_n) = (global_k < k && global_n < n)
+                ? B_tile(tid_m, tid_n)
+                : 0.0f;
+        }
+
+        __syncthreads();
+
+        for(int kk = 0; kk < BK; ++kk){
+            acc += sA(tid_m, kk) * sB(kk, tid_n);
+        }
+
+        __syncthreads();
+    }
+    if(global_m < m && global_n < n){
+        C_tile(tid_m, tid_n) = acc;
+    }
+}
+
 }  // namespace
 
 void launch_cute_gemm_v1(const float* a,
@@ -228,6 +301,27 @@ void launch_cute_gemm_v3(const float* a,
                     (m + bm - 1) / bm);
 
     cute_gemm_v3_kernel<bm, bn, bk><<<grid,
+                                      block,
+                                      0,
+                                      stream>>>(a, b, c, m, n, k);
+}
+
+void launch_cute_gemm_v4(const float* a,
+                         const float* b,
+                         float* c,
+                         int m,
+                         int n,
+                         int k,
+                         cudaStream_t stream) {
+    constexpr int bm = 16;
+    constexpr int bn = 16;
+    constexpr int bk = 8;
+
+    const dim3 block(bn, bm);
+    const dim3 grid((n + bn - 1) / bn,
+                    (m + bm - 1) / bm);
+
+    cute_gemm_v4_kernel<bm, bn, bk><<<grid,
                                       block,
                                       0,
                                       stream>>>(a, b, c, m, n, k);

@@ -14,3 +14,6 @@ cmake-build-*/
 .cache/
 .vscode/
 .idea/
+__pycache__/
+.pytest_cache/
+.torch_extensions/

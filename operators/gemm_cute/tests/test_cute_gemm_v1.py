@@ -77,6 +77,7 @@ def main() -> None:
         run_case(module, "v1", module.forward, m, n, k)
         run_case(module, "v2", module.forward_v2, m, n, k)
         run_case(module, "v3", module.forward_v3, m, n, k)
+        run_case(module, "v4", module.forward_v4, m, n, k)
 
     print("PASS")
 

@@ -26,6 +26,14 @@ void launch_cute_gemm_v3(const float* a,
                          int k,
                          cudaStream_t stream);
 
+void launch_cute_gemm_v4(const float* a,
+                         const float* b,
+                         float* c,
+                         int m,
+                         int n,
+                         int k,
+                         cudaStream_t stream);
+
 namespace {
 
 void check_input(const torch::Tensor& tensor, const char* name) {
@@ -83,6 +91,14 @@ torch::Tensor cute_gemm(torch::Tensor a,
                             n,
                             k,
                             at::cuda::getCurrentCUDAStream());
+    } else if (version == 4) {
+        launch_cute_gemm_v4(a.data_ptr<float>(),
+                            b.data_ptr<float>(),
+                            c.data_ptr<float>(),
+                            m,
+                            n,
+                            k,
+                            at::cuda::getCurrentCUDAStream());
     } else {
         TORCH_CHECK(false, "unsupported CuTe GEMM version: ", version);
     }
@@ -103,6 +119,10 @@ torch::Tensor cute_gemm_v3(torch::Tensor a, torch::Tensor b) {
     return cute_gemm(a, b, 3);
 }
 
+torch::Tensor cute_gemm_v4(torch::Tensor a, torch::Tensor b) {
+    return cute_gemm(a, b, 4);
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("forward",
           &cute_gemm_v1,
@@ -113,4 +133,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("forward_v3",
           &cute_gemm_v3,
           "CuTe GEMM v3: naive fp32 GEMM with CuTe A, B input and C output tiling");
+    m.def("forward_v4",
+          &cute_gemm_v4,
+          "CuTe GEMM v4: fp32 GEMM with CuTe shared-memory A/B tiles");
 }
