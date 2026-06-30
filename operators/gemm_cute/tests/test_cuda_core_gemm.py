@@ -21,6 +21,7 @@ def load_extension():
         sources=[
             str(ROOT / "src" / "bindings.cpp"),
             str(ROOT / "src" / "cuda_core_gemm.cu"),
+            str(ROOT / "src" / "cute_style_gemm.cu"),
         ],
         build_directory=str(BUILD_DIR),
         extra_include_paths=[
@@ -78,6 +79,7 @@ def main() -> None:
         run_case(module, "cta_tile", module.cta_tile, m, n, k)
         run_case(module, "k_tile", module.k_tile, m, n, k)
         run_case(module, "smem", module.smem_tile, m, n, k)
+        run_case(module, "cta_style", module.cta_tiler_style, m, n, k)
 
     print("PASS")
 

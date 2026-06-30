@@ -21,6 +21,7 @@ def load_extension():
         sources=[
             str(ROOT / "src" / "bindings.cpp"),
             str(ROOT / "src" / "cuda_core_gemm.cu"),
+            str(ROOT / "src" / "cute_style_gemm.cu"),
         ],
         build_directory=str(BUILD_DIR),
         extra_include_paths=[
@@ -86,6 +87,7 @@ def benchmark_shape(module,
         ("cta_tile", lambda: module.cta_tile(a, b)),
         ("k_tile", lambda: module.k_tile(a, b)),
         ("smem", lambda: module.smem_tile(a, b)),
+        ("cta_style", lambda: module.cta_tiler_style(a, b)),
         ("torch", lambda: a @ b),
     ]
 
@@ -96,6 +98,7 @@ def benchmark_shape(module,
         check_close("cta_tile", module.cta_tile(a, b), ref)
         check_close("k_tile", module.k_tile(a, b), ref)
         check_close("smem", module.smem_tile(a, b), ref)
+        check_close("cta_style", module.cta_tiler_style(a, b), ref)
 
     print(f"\nM={m} N={n} K={k}  warmup={warmup} iters={iters}")
     print(f"{'kernel':<10s} {'ms':>12s} {'TFLOPS':>12s}")
