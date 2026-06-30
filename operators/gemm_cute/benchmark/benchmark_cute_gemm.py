@@ -9,7 +9,7 @@ from torch.utils.cpp_extension import load
 
 ROOT = Path(__file__).resolve().parents[1]
 CUTLASS_ROOT = Path("/home/evanderfan/workspace/third_party/cutlass-v3.2.2")
-BUILD_DIR = ROOT / ".torch_extensions" / "cute_gemm_v1"
+BUILD_DIR = ROOT / ".torch_extensions" / "gemm_cute"
 
 
 def load_extension():
@@ -17,10 +17,10 @@ def load_extension():
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
 
     return load(
-        name="cute_gemm_v1",
+        name="gemm_cute_cuda_core",
         sources=[
             str(ROOT / "src" / "bindings.cpp"),
-            str(ROOT / "src" / "cute_gemm_v1.cu"),
+            str(ROOT / "src" / "cuda_core_gemm.cu"),
         ],
         build_directory=str(BUILD_DIR),
         extra_include_paths=[
@@ -82,20 +82,20 @@ def benchmark_shape(module,
     b = torch.randn((k, n), device="cuda", dtype=torch.float32)
 
     kernels = [
-        ("v1", lambda: module.forward(a, b)),
-        ("v2", lambda: module.forward_v2(a, b)),
-        ("v3", lambda: module.forward_v3(a, b)),
-        ("v4", lambda: module.forward_v4(a, b)),
+        ("tensor", lambda: module.tensor_index(a, b)),
+        ("cta_tile", lambda: module.cta_tile(a, b)),
+        ("k_tile", lambda: module.k_tile(a, b)),
+        ("smem", lambda: module.smem_tile(a, b)),
         ("torch", lambda: a @ b),
     ]
 
     if do_check:
         ref = a @ b
         torch.cuda.synchronize()
-        check_close("v1", module.forward(a, b), ref)
-        check_close("v2", module.forward_v2(a, b), ref)
-        check_close("v3", module.forward_v3(a, b), ref)
-        check_close("v4", module.forward_v4(a, b), ref)
+        check_close("tensor", module.tensor_index(a, b), ref)
+        check_close("cta_tile", module.cta_tile(a, b), ref)
+        check_close("k_tile", module.k_tile(a, b), ref)
+        check_close("smem", module.smem_tile(a, b), ref)
 
     print(f"\nM={m} N={n} K={k}  warmup={warmup} iters={iters}")
     print(f"{'kernel':<10s} {'ms':>12s} {'TFLOPS':>12s}")
@@ -108,7 +108,7 @@ def benchmark_shape(module,
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Benchmark CuTe GEMM v1-v4 against torch.matmul")
+        description="Benchmark CuTe CUDA-core GEMM variants against torch.matmul")
     parser.add_argument("--m", type=int, default=None)
     parser.add_argument("--n", type=int, default=None)
     parser.add_argument("--k", type=int, default=None)

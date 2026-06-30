@@ -9,7 +9,7 @@ from torch.utils.cpp_extension import load
 ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = ROOT.parents[1]
 CUTLASS_ROOT = Path("/home/evanderfan/workspace/third_party/cutlass-v3.2.2")
-BUILD_DIR = ROOT / ".torch_extensions" / "cute_gemm_v1"
+BUILD_DIR = ROOT / ".torch_extensions" / "gemm_cute"
 
 
 def load_extension():
@@ -17,10 +17,10 @@ def load_extension():
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
 
     return load(
-        name="cute_gemm_v1",
+        name="gemm_cute_cuda_core",
         sources=[
             str(ROOT / "src" / "bindings.cpp"),
-            str(ROOT / "src" / "cute_gemm_v1.cu"),
+            str(ROOT / "src" / "cuda_core_gemm.cu"),
         ],
         build_directory=str(BUILD_DIR),
         extra_include_paths=[
@@ -74,10 +74,10 @@ def main() -> None:
         (127, 131, 64),
         (256, 129, 33),
     ]:
-        run_case(module, "v1", module.forward, m, n, k)
-        run_case(module, "v2", module.forward_v2, m, n, k)
-        run_case(module, "v3", module.forward_v3, m, n, k)
-        run_case(module, "v4", module.forward_v4, m, n, k)
+        run_case(module, "tensor", module.tensor_index, m, n, k)
+        run_case(module, "cta_tile", module.cta_tile, m, n, k)
+        run_case(module, "k_tile", module.k_tile, m, n, k)
+        run_case(module, "smem", module.smem_tile, m, n, k)
 
     print("PASS")
 

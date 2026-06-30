@@ -2,7 +2,7 @@
 #include <cuda_runtime.h>
 #include <torch/extension.h>
 
-void launch_cute_gemm_v1(const float* a,
+void launch_tensor_index_gemm(const float* a,
                          const float* b,
                          float* c,
                          int m,
@@ -10,7 +10,7 @@ void launch_cute_gemm_v1(const float* a,
                          int k,
                          cudaStream_t stream);
 
-void launch_cute_gemm_v2(const float* a,
+void launch_cta_tile_gemm(const float* a,
                          const float* b,
                          float* c,
                          int m,
@@ -18,7 +18,7 @@ void launch_cute_gemm_v2(const float* a,
                          int k,
                          cudaStream_t stream);
 
-void launch_cute_gemm_v3(const float* a,
+void launch_k_tile_gemm(const float* a,
                          const float* b,
                          float* c,
                          int m,
@@ -26,7 +26,7 @@ void launch_cute_gemm_v3(const float* a,
                          int k,
                          cudaStream_t stream);
 
-void launch_cute_gemm_v4(const float* a,
+void launch_smem_tile_gemm(const float* a,
                          const float* b,
                          float* c,
                          int m,
@@ -52,9 +52,9 @@ void check_cuda(cudaError_t error) {
 
 }  // namespace
 
-torch::Tensor cute_gemm(torch::Tensor a,
-                        torch::Tensor b,
-                        int version) {
+torch::Tensor cute_gemm_dispatch(torch::Tensor a,
+                                 torch::Tensor b,
+                                 int version) {
     check_input(a, "a");
     check_input(b, "b");
 
@@ -68,7 +68,7 @@ torch::Tensor cute_gemm(torch::Tensor a,
     auto c = torch::empty({m, n}, a.options());
 
     if (version == 1) {
-        launch_cute_gemm_v1(a.data_ptr<float>(),
+        launch_tensor_index_gemm(a.data_ptr<float>(),
                             b.data_ptr<float>(),
                             c.data_ptr<float>(),
                             m,
@@ -76,7 +76,7 @@ torch::Tensor cute_gemm(torch::Tensor a,
                             k,
                             at::cuda::getCurrentCUDAStream());
     } else if (version == 2) {
-        launch_cute_gemm_v2(a.data_ptr<float>(),
+        launch_cta_tile_gemm(a.data_ptr<float>(),
                             b.data_ptr<float>(),
                             c.data_ptr<float>(),
                             m,
@@ -84,7 +84,7 @@ torch::Tensor cute_gemm(torch::Tensor a,
                             k,
                             at::cuda::getCurrentCUDAStream());
     } else if (version == 3) {
-        launch_cute_gemm_v3(a.data_ptr<float>(),
+        launch_k_tile_gemm(a.data_ptr<float>(),
                             b.data_ptr<float>(),
                             c.data_ptr<float>(),
                             m,
@@ -92,7 +92,7 @@ torch::Tensor cute_gemm(torch::Tensor a,
                             k,
                             at::cuda::getCurrentCUDAStream());
     } else if (version == 4) {
-        launch_cute_gemm_v4(a.data_ptr<float>(),
+        launch_smem_tile_gemm(a.data_ptr<float>(),
                             b.data_ptr<float>(),
                             c.data_ptr<float>(),
                             m,
@@ -107,33 +107,39 @@ torch::Tensor cute_gemm(torch::Tensor a,
     return c;
 }
 
-torch::Tensor cute_gemm_v1(torch::Tensor a, torch::Tensor b) {
-    return cute_gemm(a, b, 1);
+torch::Tensor tensor_index_gemm(torch::Tensor a, torch::Tensor b) {
+    return cute_gemm_dispatch(a, b, 1);
 }
 
-torch::Tensor cute_gemm_v2(torch::Tensor a, torch::Tensor b) {
-    return cute_gemm(a, b, 2);
+torch::Tensor cta_tile_gemm(torch::Tensor a, torch::Tensor b) {
+    return cute_gemm_dispatch(a, b, 2);
 }
 
-torch::Tensor cute_gemm_v3(torch::Tensor a, torch::Tensor b) {
-    return cute_gemm(a, b, 3);
+torch::Tensor k_tile_gemm(torch::Tensor a, torch::Tensor b) {
+    return cute_gemm_dispatch(a, b, 3);
 }
 
-torch::Tensor cute_gemm_v4(torch::Tensor a, torch::Tensor b) {
-    return cute_gemm(a, b, 4);
+torch::Tensor smem_tile_gemm(torch::Tensor a, torch::Tensor b) {
+    return cute_gemm_dispatch(a, b, 4);
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-    m.def("forward",
-          &cute_gemm_v1,
-          "CuTe GEMM v1: naive fp32 GEMM using CuTe Tensor indexing");
-    m.def("forward_v2",
-          &cute_gemm_v2,
-          "CuTe GEMM v2: naive fp32 GEMM with CuTe C output tiling");
-    m.def("forward_v3",
-          &cute_gemm_v3,
-          "CuTe GEMM v3: naive fp32 GEMM with CuTe A, B input and C output tiling");
-    m.def("forward_v4",
-          &cute_gemm_v4,
-          "CuTe GEMM v4: fp32 GEMM with CuTe shared-memory A/B tiles");
+    m.def("tensor_index",
+          &tensor_index_gemm,
+          "CuTe GEMM: naive fp32 GEMM using CuTe Tensor indexing");
+    m.def("cta_tile",
+          &cta_tile_gemm,
+          "CuTe GEMM: fp32 GEMM with CuTe C output tiling");
+    m.def("k_tile",
+          &k_tile_gemm,
+          "CuTe GEMM: fp32 GEMM with CuTe A/B/C K tiling");
+    m.def("smem_tile",
+          &smem_tile_gemm,
+          "CuTe GEMM: fp32 GEMM with CuTe shared-memory A/B tiles");
+
+    // Backward-compatible aliases while the tutorial is still evolving.
+    m.def("forward", &tensor_index_gemm);
+    m.def("forward_v2", &cta_tile_gemm);
+    m.def("forward_v3", &k_tile_gemm);
+    m.def("forward_v4", &smem_tile_gemm);
 }

@@ -4,7 +4,7 @@
 
 namespace {
 
-// v1 goal:
+// tensor_index goal:
 //   - Use CuTe Tensor to express row-major A/B/C indexing.
 //   - Keep the CUDA execution model intentionally simple:
 //       one CUDA thread computes one C[row, col].
@@ -13,7 +13,7 @@ namespace {
 //   A: [M, K], row-major
 //   B: [K, N], row-major
 //   C: [M, N], row-major
-__global__ void cute_gemm_v1_kernel(const float* a,
+__global__ void tensor_index_gemm_kernel(const float* a,
                                     const float* b,
                                     float* c,
                                     int m,
@@ -58,8 +58,8 @@ __global__ void cute_gemm_v1_kernel(const float* a,
     C(row, col) = acc;
 }
 
-// v2 goal:
-//   - Keep the same simple computation as v1.
+// cta_tile goal:
+//   - Keep the same simple computation as tensor_index.
 //   - Introduce CuTe tiling for the output matrix C.
 //   - Each CTA owns one C tile with shape [BM, BN].
 //   - Each thread owns one element inside that C tile.
@@ -67,7 +67,7 @@ __global__ void cute_gemm_v1_kernel(const float* a,
 // This is the first step toward the CuTe GEMM mental model:
 //   global tensor -> CTA tile -> thread-local coordinate inside tile
 template <int BM, int BN>
-__global__ void cute_gemm_v2_kernel(const float* a,
+__global__ void cta_tile_gemm_kernel(const float* a,
                                     const float* b,
                                     float* c,
                                     int m,
@@ -119,7 +119,7 @@ __global__ void cute_gemm_v2_kernel(const float* a,
 }
 
 template<int BM, int BN, int BK>
-__global__ void cute_gemm_v3_kernel(const float* a,
+__global__ void k_tile_gemm_kernel(const float* a,
                                     const float* b,
                                     float* c,
                                     int m,
@@ -174,7 +174,7 @@ __global__ void cute_gemm_v3_kernel(const float* a,
 }
 
 template<int BM, int BN, int BK>
-__global__ void cute_gemm_v4_kernel(const float* a, 
+__global__ void smem_tile_gemm_kernel(const float* a, 
                                     const float* b,
                                     float* c,
                                     int m,
@@ -248,7 +248,7 @@ __global__ void cute_gemm_v4_kernel(const float* a,
 
 }  // namespace
 
-void launch_cute_gemm_v1(const float* a,
+void launch_tensor_index_gemm(const float* a,
                          const float* b,
                          float* c,
                          int m,
@@ -259,13 +259,13 @@ void launch_cute_gemm_v1(const float* a,
     const dim3 grid((n + block.x - 1) / block.x,
                     (m + block.y - 1) / block.y);
 
-    cute_gemm_v1_kernel<<<grid,
+    tensor_index_gemm_kernel<<<grid,
                           block,
                           0,
                           stream>>>(a, b, c, m, n, k);
 }
 
-void launch_cute_gemm_v2(const float* a,
+void launch_cta_tile_gemm(const float* a,
                          const float* b,
                          float* c,
                          int m,
@@ -279,13 +279,13 @@ void launch_cute_gemm_v2(const float* a,
     const dim3 grid((n + bn - 1) / bn,
                     (m + bm - 1) / bm);
 
-    cute_gemm_v2_kernel<bm, bn><<<grid,
+    cta_tile_gemm_kernel<bm, bn><<<grid,
                                   block,
                                   0,
                                   stream>>>(a, b, c, m, n, k);
 }
 
-void launch_cute_gemm_v3(const float* a,
+void launch_k_tile_gemm(const float* a,
                          const float* b,
                          float* c,
                          int m,
@@ -300,13 +300,13 @@ void launch_cute_gemm_v3(const float* a,
     const dim3 grid((n + bn - 1) / bn,
                     (m + bm - 1) / bm);
 
-    cute_gemm_v3_kernel<bm, bn, bk><<<grid,
+    k_tile_gemm_kernel<bm, bn, bk><<<grid,
                                       block,
                                       0,
                                       stream>>>(a, b, c, m, n, k);
 }
 
-void launch_cute_gemm_v4(const float* a,
+void launch_smem_tile_gemm(const float* a,
                          const float* b,
                          float* c,
                          int m,
@@ -321,7 +321,7 @@ void launch_cute_gemm_v4(const float* a,
     const dim3 grid((n + bn - 1) / bn,
                     (m + bm - 1) / bm);
 
-    cute_gemm_v4_kernel<bm, bn, bk><<<grid,
+    smem_tile_gemm_kernel<bm, bn, bk><<<grid,
                                       block,
                                       0,
                                       stream>>>(a, b, c, m, n, k);
