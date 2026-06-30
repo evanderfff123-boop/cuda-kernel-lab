@@ -81,6 +81,8 @@ def main() -> None:
         run_case(module, "smem", module.smem_tile, m, n, k)
         run_case(module, "cta_style", module.cta_tiler_style, m, n, k)
         run_case(module, "smem_tensor", module.smem_tensor_style, m, n, k)
+        run_case(module, "copy_part", module.copy_partition_style, m, n, k)
+        run_case(module, "math_part", module.math_partition_style, m, n, k)
 
     print("PASS")
 

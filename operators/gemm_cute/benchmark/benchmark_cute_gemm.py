@@ -89,6 +89,8 @@ def benchmark_shape(module,
         ("smem", lambda: module.smem_tile(a, b)),
         ("cta_style", lambda: module.cta_tiler_style(a, b)),
         ("smem_tensor", lambda: module.smem_tensor_style(a, b)),
+        ("copy_part", lambda: module.copy_partition_style(a, b)),
+        ("math_part", lambda: module.math_partition_style(a, b)),
         ("torch", lambda: a @ b),
     ]
 
@@ -101,6 +103,8 @@ def benchmark_shape(module,
         check_close("smem", module.smem_tile(a, b), ref)
         check_close("cta_style", module.cta_tiler_style(a, b), ref)
         check_close("smem_tensor", module.smem_tensor_style(a, b), ref)
+        check_close("copy_part", module.copy_partition_style(a, b), ref)
+        check_close("math_part", module.math_partition_style(a, b), ref)
 
     print(f"\nM={m} N={n} K={k}  warmup={warmup} iters={iters}")
     print(f"{'kernel':<10s} {'ms':>12s} {'TFLOPS':>12s}")
