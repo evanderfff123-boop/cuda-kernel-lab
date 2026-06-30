@@ -22,6 +22,7 @@ def load_extension():
             str(ROOT / "src" / "bindings.cpp"),
             str(ROOT / "src" / "cuda_core_gemm.cu"),
             str(ROOT / "src" / "cute_style_gemm.cu"),
+            str(ROOT / "src" / "cute_gemmv1.cu"),
         ],
         build_directory=str(BUILD_DIR),
         extra_include_paths=[
@@ -83,6 +84,12 @@ def main() -> None:
         run_case(module, "smem_tensor", module.smem_tensor_style, m, n, k)
         run_case(module, "copy_part", module.copy_partition_style, m, n, k)
         run_case(module, "math_part", module.math_partition_style, m, n, k)
+
+    for m, n, k in [
+        (128, 128, 128),
+        (256, 256, 128),
+    ]:
+        run_case(module, "cute_v1", module.cute_gemmv1, m, n, k)
 
     print("PASS")
 

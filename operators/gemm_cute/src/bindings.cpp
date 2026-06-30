@@ -66,6 +66,14 @@ void launch_math_partition_style_gemm(const float* a,
                                       int k,
                                       cudaStream_t stream);
 
+void launch_cute_gemmv1(const float* a,
+                        const float* b,
+                        float* c,
+                        int m,
+                        int n,
+                        int k,
+                        cudaStream_t stream);
+
 namespace {
 
 void check_input(const torch::Tensor& tensor, const char* name) {
@@ -163,6 +171,14 @@ torch::Tensor cute_gemm_dispatch(torch::Tensor a,
                                          n,
                                          k,
                                          at::cuda::getCurrentCUDAStream());
+    } else if (version == 9) {
+        launch_cute_gemmv1(a.data_ptr<float>(),
+                           b.data_ptr<float>(),
+                           c.data_ptr<float>(),
+                           m,
+                           n,
+                           k,
+                           at::cuda::getCurrentCUDAStream());
     } else {
         TORCH_CHECK(false, "unsupported CuTe GEMM version: ", version);
     }
@@ -203,6 +219,10 @@ torch::Tensor math_partition_style_gemm(torch::Tensor a, torch::Tensor b) {
     return cute_gemm_dispatch(a, b, 8);
 }
 
+torch::Tensor cute_gemmv1(torch::Tensor a, torch::Tensor b) {
+    return cute_gemm_dispatch(a, b, 9);
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("tensor_index",
           &tensor_index_gemm,
@@ -228,6 +248,9 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("math_partition_style",
           &math_partition_style_gemm,
           "CuTe-style GEMM: math partitioning with cute::gemm");
+    m.def("cute_gemmv1",
+          &cute_gemmv1,
+          "CuTe source-study GEMM v1");
 
     // Backward-compatible aliases while the tutorial is still evolving.
     m.def("forward", &tensor_index_gemm);
@@ -238,4 +261,5 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("forward_v6", &smem_tensor_style_gemm);
     m.def("forward_v7", &copy_partition_style_gemm);
     m.def("forward_v8", &math_partition_style_gemm);
+    m.def("forward_v9", &cute_gemmv1);
 }
