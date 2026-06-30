@@ -42,6 +42,14 @@ void launch_cta_tiler_style_gemm(const float* a,
                                  int k,
                                  cudaStream_t stream);
 
+void launch_smem_tensor_style_gemm(const float* a,
+                                   const float* b,
+                                   float* c,
+                                   int m,
+                                   int n,
+                                   int k,
+                                   cudaStream_t stream);
+
 namespace {
 
 void check_input(const torch::Tensor& tensor, const char* name) {
@@ -115,6 +123,14 @@ torch::Tensor cute_gemm_dispatch(torch::Tensor a,
                                     n,
                                     k,
                                     at::cuda::getCurrentCUDAStream());
+    } else if (version == 6) {
+        launch_smem_tensor_style_gemm(a.data_ptr<float>(),
+                                      b.data_ptr<float>(),
+                                      c.data_ptr<float>(),
+                                      m,
+                                      n,
+                                      k,
+                                      at::cuda::getCurrentCUDAStream());
     } else {
         TORCH_CHECK(false, "unsupported CuTe GEMM version: ", version);
     }
@@ -143,6 +159,10 @@ torch::Tensor cta_tiler_style_gemm(torch::Tensor a, torch::Tensor b) {
     return cute_gemm_dispatch(a, b, 5);
 }
 
+torch::Tensor smem_tensor_style_gemm(torch::Tensor a, torch::Tensor b) {
+    return cute_gemm_dispatch(a, b, 6);
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("tensor_index",
           &tensor_index_gemm,
@@ -159,6 +179,9 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("cta_tiler_style",
           &cta_tiler_style_gemm,
           "CuTe-style GEMM: CTA tiler with logical B [N, K]");
+    m.def("smem_tensor_style",
+          &smem_tensor_style_gemm,
+          "CuTe-style GEMM: shared-memory tensors from explicit SMEM layouts");
 
     // Backward-compatible aliases while the tutorial is still evolving.
     m.def("forward", &tensor_index_gemm);
@@ -166,4 +189,5 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("forward_v3", &k_tile_gemm);
     m.def("forward_v4", &smem_tile_gemm);
     m.def("forward_v5", &cta_tiler_style_gemm);
+    m.def("forward_v6", &smem_tensor_style_gemm);
 }

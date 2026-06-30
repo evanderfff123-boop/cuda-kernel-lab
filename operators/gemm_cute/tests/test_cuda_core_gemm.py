@@ -80,6 +80,7 @@ def main() -> None:
         run_case(module, "k_tile", module.k_tile, m, n, k)
         run_case(module, "smem", module.smem_tile, m, n, k)
         run_case(module, "cta_style", module.cta_tiler_style, m, n, k)
+        run_case(module, "smem_tensor", module.smem_tensor_style, m, n, k)
 
     print("PASS")
 
