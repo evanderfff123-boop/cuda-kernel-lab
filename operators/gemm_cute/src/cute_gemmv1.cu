@@ -65,6 +65,36 @@ gemm_device(ProblemShape shape_MNK, CtaTiler cta_tiler,
     Tensor tCrC = make_tensor_like(tCgC);
 
     clear(tCrC);
+#if 0
+    if(thread0()){
+        print("  mA : "); print(  mA); print("\n");
+        print("  gA : "); print(  gA); print("\n");
+        print("  sA : "); print(  sA); print("\n");
+        print("tAgA : "); print(tAgA); print("\n");
+        print("tAsA : "); print(tAsA); print("\n");
+    }
+#endif
+
+#if 0
+    if(thread0()) {
+        print("  mB : "); print(  mB); print("\n");
+        print("  gB : "); print(  gB); print("\n");
+        print("  sB : "); print(  sB); print("\n");
+        print("tBgB : "); print(tBgB); print("\n");
+        print("tBsB : "); print(tBsB); print("\n");
+    }
+#endif
+
+#if 0
+    if(thread0()) {
+        print("  mC : "); print(  mC); print("\n");
+        print("  gC : "); print(  gC); print("\n");
+        print("tCsA : "); print(tCsA); print("\n");
+        print("tCsB : "); print(tCsB); print("\n");
+        print("tCgC : "); print(tCgC); print("\n");
+        print("tCrC : "); print(tCrC); print("\n");
+    }
+#endif
 
     // 主循环--K轴迭代计算
     // K_TILE_MAX：沿着K轴需要迭代的总步数
