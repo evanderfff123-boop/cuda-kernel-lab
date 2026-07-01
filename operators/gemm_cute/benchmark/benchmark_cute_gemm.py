@@ -23,6 +23,7 @@ def load_extension():
             str(ROOT / "src" / "cuda_core_gemm.cu"),
             str(ROOT / "src" / "cute_style_gemm.cu"),
             str(ROOT / "src" / "cute_gemmv1.cu"),
+            str(ROOT / "src" / "cute_gemmv2.cu"),
         ],
         build_directory=str(BUILD_DIR),
         extra_include_paths=[
@@ -93,6 +94,7 @@ def benchmark_shape(module,
         ("copy_part", lambda: module.copy_partition_style(a, b)),
         ("math_part", lambda: module.math_partition_style(a, b)),
         ("cute_v1", lambda: module.cute_gemmv1(a, b)),
+        ("cute_v2", lambda: module.cute_gemmv2(a, b)),
         ("torch", lambda: a @ b),
     ]
 
@@ -108,6 +110,7 @@ def benchmark_shape(module,
         check_close("copy_part", module.copy_partition_style(a, b), ref)
         check_close("math_part", module.math_partition_style(a, b), ref)
         check_close("cute_v1", module.cute_gemmv1(a, b), ref)
+        check_close("cute_v2", module.cute_gemmv2(a, b), ref)
 
     print(f"\nM={m} N={n} K={k}  warmup={warmup} iters={iters}")
     print(f"{'kernel':<10s} {'ms':>12s} {'TFLOPS':>12s}")

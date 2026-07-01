@@ -23,6 +23,7 @@ def load_extension():
             str(ROOT / "src" / "cuda_core_gemm.cu"),
             str(ROOT / "src" / "cute_style_gemm.cu"),
             str(ROOT / "src" / "cute_gemmv1.cu"),
+            str(ROOT / "src" / "cute_gemmv2.cu"),
         ],
         build_directory=str(BUILD_DIR),
         extra_include_paths=[
@@ -110,6 +111,7 @@ def main() -> None:
     ]
     cute_source_kernels = [
         ("cute_v1", module.cute_gemmv1),
+        ("cute_v2", module.cute_gemmv2),
     ]
     run_group("CuTe source-study kernels", module, cute_source_kernels, cute_source_shapes)
 
