@@ -12,6 +12,7 @@ can gradually move into `common/` as patterns stabilize.
 | Operator | Status | Notes |
 |---|---|---|
 | `transpose` | ready | FP32 square matrix transpose with naive, shared-memory, padded, tiled, and cuBLAS baseline variants |
+| `gemm_cute` | learning | FP32 GEMM variants for CUDA-core optimization and CuTe source-study kernels |
 
 ## Build
 
@@ -31,11 +32,24 @@ The default architecture is `sm_75`, matching GTX 1650 Ti. Override
 ctest --test-dir build --output-on-failure
 ```
 
+CuTe GEMM uses PyTorch JIT extensions for fast iteration:
+
+```bash
+python3 operators/gemm_cute/tests/test_cuda_core_gemm.py
+```
+
 ## Benchmark
 
 ```bash
 ./build/operators/transpose/transpose_benchmark --check
 ./build/operators/transpose/transpose_benchmark --size 4096 --check
+```
+
+For CuTe GEMM:
+
+```bash
+python3 operators/gemm_cute/benchmark/benchmark_cute_gemm.py --check
+python3 operators/gemm_cute/benchmark/benchmark_cute_gemm.py --m 1024 --n 1024 --k 512 --warmup 10 --iters 100 --check
 ```
 
 Or run the full build/test/benchmark flow:
@@ -51,14 +65,48 @@ Or run the full build/test/benchmark flow:
 ├── CMakeLists.txt
 ├── common/
 ├── operators/
-│   └── transpose/
-│       ├── include/
+│   ├── transpose/
+│   │   ├── include/
+│   │   ├── src/
+│   │   ├── tests/
+│   │   └── benchmark/
+│   └── gemm_cute/
 │       ├── src/
 │       ├── tests/
 │       └── benchmark/
 ├── docs/
 └── scripts/
 ```
+
+## CuTe GEMM notes
+
+`operators/gemm_cute` is a learning-focused area for GEMM kernels:
+
+- `src/cuda_core_gemm.cu`: CUDA-core GEMM variants using progressively richer CuTe tensor/layout indexing.
+- `src/cute_style_gemm.cu`: CuTe-style variants for CTA tiling, SMEM tensors, copy partitioning, and math partitioning.
+- `src/cute_gemmv1.cu`: source-study implementation modeled after CuTe tutorial SGEMM.
+- `tests/test_cuda_core_gemm.py`: correctness tests against `torch.matmul`.
+- `benchmark/benchmark_cute_gemm.py`: timing and TFLOPS comparison against `torch.matmul`.
+
+The CuTe source-study kernel contains disabled tensor-layout print helpers:
+
+```cpp
+#if 0
+    if(thread0()) {
+        print("  mA : "); print(mA); print("\n");
+        // ...
+    }
+#endif
+```
+
+To inspect CuTe tensors while learning, temporarily change one block from
+`#if 0` to `#if 1`, then run:
+
+```bash
+python3 operators/gemm_cute/tests/test_cuda_core_gemm.py
+```
+
+Enable only one print block at a time; otherwise the output becomes noisy.
 
 ## Development pattern
 
