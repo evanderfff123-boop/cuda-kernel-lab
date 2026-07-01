@@ -22,6 +22,7 @@ def load_extension():
             str(ROOT / "src" / "bindings.cpp"),
             str(ROOT / "src" / "cuda_core_gemm.cu"),
             str(ROOT / "src" / "cute_style_gemm.cu"),
+            str(ROOT / "src" / "cute_gemmv1.cu"),
         ],
         build_directory=str(BUILD_DIR),
         extra_include_paths=[
@@ -37,7 +38,7 @@ def load_extension():
     )
 
 
-def run_case(module, name: str, fn, m: int, n: int, k: int) -> None:
+def run_case(fn, m: int, n: int, k: int) -> tuple[float, float]:
     torch.manual_seed(0)
     a = torch.randn((m, k), device="cuda", dtype=torch.float32)
     b = torch.randn((k, n), device="cuda", dtype=torch.float32)
@@ -50,11 +51,21 @@ def run_case(module, name: str, fn, m: int, n: int, k: int) -> None:
     max_ref = ref.abs().max().item()
     rel = max_abs / max(max_ref, 1.0e-6)
 
-    print(
-        f"{name:>10s}  M={m:4d} N={n:4d} K={k:4d} "
-        f"max_abs={max_abs:.6e} rel={rel:.6e}"
-    )
     torch.testing.assert_close(out, ref, rtol=1.0e-4, atol=1.0e-4)
+    return max_abs, rel
+
+
+def run_group(title: str, module, kernels, shapes) -> None:
+    print(f"\n{title}")
+
+    for m, n, k in shapes:
+        print(f"\nM={m} N={n} K={k}")
+        print(f"{'kernel':<12s} {'max_abs':>12s} {'rel':>12s}")
+        print(f"{'-' * 12} {'-' * 12} {'-' * 12}")
+
+        for name, fn in kernels:
+            max_abs, rel = run_case(fn, m, n, k)
+            print(f"{name:<12s} {max_abs:12.3e} {rel:12.3e}")
 
 
 def main() -> None:
@@ -69,22 +80,40 @@ def main() -> None:
 
     module = load_extension()
 
-    for m, n, k in [
+    cuda_core_shapes = [
         (16, 16, 16),
         (128, 128, 128),
+        (256, 256, 256),
+        (512, 512, 512),
+        (1024, 1024, 512),
         (127, 131, 64),
         (256, 129, 33),
-    ]:
-        run_case(module, "tensor", module.tensor_index, m, n, k)
-        run_case(module, "cta_tile", module.cta_tile, m, n, k)
-        run_case(module, "k_tile", module.k_tile, m, n, k)
-        run_case(module, "smem", module.smem_tile, m, n, k)
-        run_case(module, "cta_style", module.cta_tiler_style, m, n, k)
-        run_case(module, "smem_tensor", module.smem_tensor_style, m, n, k)
-        run_case(module, "copy_part", module.copy_partition_style, m, n, k)
-        run_case(module, "math_part", module.math_partition_style, m, n, k)
+        (511, 509, 257),
+    ]
+    cuda_core_kernels = [
+        ("tensor", module.tensor_index),
+        ("cta_tile", module.cta_tile),
+        ("k_tile", module.k_tile),
+        ("smem", module.smem_tile),
+        ("cta_style", module.cta_tiler_style),
+        ("smem_tensor", module.smem_tensor_style),
+        ("copy_part", module.copy_partition_style),
+        ("math_part", module.math_partition_style),
+    ]
+    run_group("CUDA-core / CuTe-style kernels", module, cuda_core_kernels, cuda_core_shapes)
 
-    print("PASS")
+    cute_source_shapes = [
+        (128, 128, 128),
+        (256, 256, 128),
+        (512, 512, 256),
+        (1024, 1024, 512),
+    ]
+    cute_source_kernels = [
+        ("cute_v1", module.cute_gemmv1),
+    ]
+    run_group("CuTe source-study kernels", module, cute_source_kernels, cute_source_shapes)
+
+    print("\nPASS")
 
 
 if __name__ == "__main__":
